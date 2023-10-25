@@ -1,0 +1,9 @@
+
+[submodule "openssl"]
+	path = openssl
+	url = https://github.com/openssl/openssl
+	branch = OpenSSL_1_1_1-stable
+[submodule "libwebsockets"]
+	path = libwebsockets
+	url = https://github.com/setoutsoft/libwebsockets.git
+	branch = soui_ws
