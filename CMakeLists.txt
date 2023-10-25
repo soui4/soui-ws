@@ -17,11 +17,19 @@ set(LWS_WITH_MINIMAL_EXAMPLES OFF CACHE BOOL "")
 set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "")
 set(LWS_WITH_STATIC ON CACHE BOOL "")
 set(LWS_WITH_SHARED OFF CACHE BOOL "")
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+set(LWS_OPENSSL_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/openssl_output/x64/include CACHE PATH "")
+else()
 set(LWS_OPENSSL_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/openssl_output/x86/include CACHE PATH "")
+endif()
+set(LWS_OPENSSL_LIBRARIES "libssl.lib;libcrypto.lib")
+
 add_subdirectory(libwebsockets)
 
-set(OPENSSL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/openssl_output/x86/include")
-set(LWS_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/libwebsockets/include")
+set(WS_OPENSSL_INCLUDE ${LWS_OPENSSL_INCLUDE_DIRS})
+
+set(WS_LWS_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/libwebsockets/include")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/libwebsockets")
 link_directories("${CMAKE_CURRENT_BINARY_DIR}/libwebsockets/lib")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -30,7 +38,7 @@ else()
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/openssl_output/x86/lib")
 endif()
 
-set(LWS_LIB "Crypt32.lib;Ws2_32.lib;websockets_static.lib;libssl.lib;libcrypto.lib")
+set(WS_LWS_LIB "Crypt32.lib;Ws2_32.lib;websockets_static.lib;libssl.lib;libcrypto.lib")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/openssl-1.1.1/include)
 include_directories("$ENV{SOUI4PATH}/config")

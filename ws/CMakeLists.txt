@@ -1,19 +1,19 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(OPENSSL_INCLUDE CACHE PATH "Path to the openSSL include directory" )
-set(LWS_INCLUDE CACHE PATH "Path to the libwebsodket include directory " )
-set(LWS_LIB CACHE PATH "libs" )
+set(WS_OPENSSL_INCLUDE "" CACHE PATH "Path to the openSSL include directory" )
+set(WS_LWS_INCLUDE "" CACHE PATH "Path to the libwebsodket include directory " )
+set(WS_LWS_LIB CACHE PATH "libs" )
 
-if(NOT EXISTS "${OPENSSL_INCLUDE}")
-    message(FATAL_ERROR "path of OPENSSL_INCLUDE = ${OPENSSL_INCLUDE} not found!")
+if(NOT EXISTS "${WS_OPENSSL_INCLUDE}")
+    message(FATAL_ERROR "path of WS_OPENSSL_INCLUDE = ${WS_OPENSSL_INCLUDE} not found!")
 endif()
 
-if(NOT EXISTS "${LWS_INCLUDE}")
-    message(FATAL_ERROR "path of LWS_INCLUDE = ${LWS_INCLUDE} not found!")
+if(NOT EXISTS "${WS_LWS_INCLUDE}")
+    message(FATAL_ERROR "path of WS_LWS_INCLUDE = ${WS_LWS_INCLUDE} not found!")
 endif()
 
-include_directories(${LWS_INCLUDE})
-include_directories(${OPENSSL_INCLUDE})
+include_directories(${WS_LWS_INCLUDE})
+include_directories(${WS_OPENSSL_INCLUDE})
 
 # Building
 project(ws)
@@ -29,7 +29,7 @@ set(SOURCES
         src/ws.cpp
 )
 
-set(LIBS ${LWS_LIB})
+set(LIBS ${WS_LWS_LIB})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
