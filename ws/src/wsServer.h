@@ -17,22 +17,23 @@
 SNSBEGIN
 
 class WsServer : public TObjRefImpl<IWsServer> {
-    friend class Connection;
+    friend class SvrConnection;
 
   public:
     WsServer(ISvrListener *pListener);
     ~WsServer();
 
+  public:
     int start(uint16_t port, const char *protocolName, SvrOption option) override;
     void broadcast(const void *text, int len, bool bBinary, int groupId = kAllGroupId) override;
     bool wait(int timeoutMs) override;
     void quit() override;
-
+    void enumGroup(FunEnumGroup funEnum, LPARAM ctx) override;
   private:
     void run();
     int handler(lws *websocket, lws_callback_reasons reasons, void *id, void *data, size_t len);
 
-    ISvrListener *m_pListener;
+    ISvrListener *m_pGroup;
 
     std::condition_variable m_cvQuit;
     std::mutex m_mutex;
@@ -45,6 +46,7 @@ class WsServer : public TObjRefImpl<IWsServer> {
     std::map<int, IConnGroup *> m_groupMap;
 
     static int cb_lws(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, std::size_t len);
+
 };
 SNSEND
 #endif // WsServer_H

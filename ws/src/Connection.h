@@ -11,10 +11,10 @@
 
 SNSBEGIN
 
-class Connection : public TObjRefImpl<IConnection> {
+class SvrConnection : public TObjRefImpl<ISvrConnection> {
   public:
-    Connection(lws *socket, IConnGroup *pListener, int id);
-    ~Connection();
+    SvrConnection(lws *socket, IConnGroup* pGroup, int id);
+    ~SvrConnection();
 
     int send(const std::string &text, bool bBinary);
     void onRecv(const std::string &message, bool isLastMessage, bool bBinary);
@@ -24,9 +24,9 @@ class Connection : public TObjRefImpl<IConnection> {
     int isValid() const override;
     int sendText(const char *text, int nLen = -1) override;
     int sendBinary(const void *data, int nLen) override;
-    IConnGroup *getGroup() override
+    int getGroupId() const override
     {
-        return m_pListener;
+        return m_pGroup->getId();
     }
     int getId() const override
     {
@@ -42,12 +42,11 @@ class Connection : public TObjRefImpl<IConnection> {
         return m_msgId;
     }
     int m_id;
-    int m_groupId;
     lws *socket;
 
     std::mutex m_mutex;
 
-    IConnGroup *m_pListener;
+    IConnGroup *m_pGroup;
     struct MsgData
     {
         std::string buf;

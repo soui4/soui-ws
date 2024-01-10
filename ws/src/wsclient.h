@@ -39,15 +39,7 @@ class WsClient : public TObjRefImpl<IWsClient> {
     {
         return send(std::string((const char *)data, nLen), true);
     }
-    IConnGroup *getGroup() override
-    {
-        return nullptr;
-    }
-    int getId() const override
-    {
-        return 0;
-    }
-
+ 
     void disconnect() override;
 
   private:
@@ -66,7 +58,7 @@ class WsClient : public TObjRefImpl<IWsClient> {
     void run();
     int handler(lws_callback_reasons reasons, void *user, const void *data, std::size_t len);
 
-    IConnListener *m_pListener;
+    IConnListener *m_pGroup;
     std::thread m_worker;
     std::atomic_bool m_finished;
     std::atomic_bool m_connected;

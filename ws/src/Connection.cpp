@@ -4,19 +4,19 @@
 
 SNSBEGIN
 
-Connection::Connection(lws *socket, IConnGroup *pListener, int id)
+SvrConnection::SvrConnection(lws *socket, IConnGroup* pGroup, int id)
     : socket{ socket }
     , m_msgId(0)
-    , m_pListener(pListener)
     , m_id(id)
+    , m_pGroup(pGroup)
 {
 }
 
-Connection::~Connection()
+SvrConnection::~SvrConnection()
 {
 }
 
-int Connection::send(const std::string &text, bool bBinary)
+int SvrConnection::send(const std::string &text, bool bBinary)
 {
     if (!this->socket)
     {
@@ -30,12 +30,12 @@ int Connection::send(const std::string &text, bool bBinary)
     return msgData.msgId;
 }
 
-int Connection::isValid() const
+int SvrConnection::isValid() const
 {
     return !!this->socket;
 }
 
-void Connection::sendBuf()
+void SvrConnection::sendBuf()
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
     while (!sendingBuf.empty())
@@ -51,9 +51,9 @@ void Connection::sendBuf()
             // todo:close the connect
             break;
         }
-        if (m_pListener)
+        if (m_pGroup)
         {
-            m_pListener->onDataSent(this, msgData.msgId);
+            m_pGroup->onDataSent(this, msgData.msgId);
         }
         if (lws_send_pipe_choked(socket))
         {
@@ -63,26 +63,26 @@ void Connection::sendBuf()
     };
 }
 
-void Connection::onRecv(const std::string &message, bool isLastMessage, bool bBinary)
+void SvrConnection::onRecv(const std::string &message, bool isLastMessage, bool bBinary)
 {
     this->receiveStream << message;
     if (isLastMessage)
     {
-        if (m_pListener)
+        if (m_pGroup)
         {
-            m_pListener->onDataRecv(this, message.c_str(), message.length(), bBinary);
+            m_pGroup->onDataRecv(this, message.c_str(), message.length(), bBinary);
         }
         this->receiveStream.str(std::string{});
     }
 }
 
-int Connection::sendText(const char *text, int nLen)
+int SvrConnection::sendText(const char *text, int nLen)
 {
     if (nLen < 0)
         nLen = strlen(text);
     return send(std::string(text, nLen), false);
 }
-int Connection::sendBinary(const void *data, int nLen)
+int SvrConnection::sendBinary(const void *data, int nLen)
 {
     return send(std::string((const char *)data, nLen), true);
 }

@@ -8,7 +8,7 @@ using namespace SOUI;
 
 class ConnGroup : public TObjRefImpl<IConnGroup> {
     int m_id;
-    std::map<int, IConnection *> m_conns;
+    std::map<int, ISvrConnection*> m_conns;
     int m_autoId;
     IWsServer* m_pSvr;
   public:
@@ -24,10 +24,10 @@ class ConnGroup : public TObjRefImpl<IConnGroup> {
     {
         return m_id;
     }
-    void onConnError(IConnection *pConn, const char *errStr)
+    void onConnError(ISvrConnection *pConn, const char *errStr) override
     {
     }
-    bool onConnected(IConnection *pConn)
+    bool onConnected(ISvrConnection*pConn) override
     {
         std::cout << "New Connection!" << std::endl;
         if (m_conns.find(pConn->getId()) != m_conns.end())
@@ -40,7 +40,7 @@ class ConnGroup : public TObjRefImpl<IConnGroup> {
         return true;
     }
 
-    void onDisconnect(IConnection *pConn)
+    void onDisconnect(ISvrConnection*pConn) override
     {
         std::cout << "onDisconnect!" << std::endl;
         m_conns.erase(pConn->getId());
@@ -49,10 +49,10 @@ class ConnGroup : public TObjRefImpl<IConnGroup> {
         sprintf(msg, "group size, %d", m_conns.size());
         boardcast(msg, -1, false);
     }
-    void onDataSent(IConnection *pConn, int nMsgId)
+    void onDataSent(ISvrConnection *pConn, int nMsgId) override
     {
     }
-    void onDataRecv(IConnection *pConn, const void *data, int len, bool bBinary)
+    void onDataRecv(ISvrConnection*pConn, const void *data, int len, bool bBinary)override
     {
         std::cout << "Received: " << std::string((const char *)data, len).c_str() << std::endl;
         pConn->sendText("Echo4567890123");
