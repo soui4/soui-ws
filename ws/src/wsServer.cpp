@@ -104,15 +104,6 @@ void WsServer::broadcast(const void *text, int len, bool bBinary, int groupId)
     }
 }
 
-void WsServer::enumGroup(FunEnumGroup funEnum, LPARAM ctx)
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-    for (const auto& it : this->m_groupMap) {
-        if (!funEnum(it.second,ctx))
-            break;
-    }
-}
-
 int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, size_t len)
 {
     int ret = 0;

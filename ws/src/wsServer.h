@@ -28,7 +28,6 @@ class WsServer : public TObjRefImpl<IWsServer> {
     void broadcast(const void *text, int len, bool bBinary, int groupId = kAllGroupId) override;
     bool wait(int timeoutMs) override;
     void quit() override;
-    void enumGroup(FunEnumGroup funEnum, LPARAM ctx) override;
   private:
     void run();
     int handler(lws *websocket, lws_callback_reasons reasons, void *id, void *data, size_t len);

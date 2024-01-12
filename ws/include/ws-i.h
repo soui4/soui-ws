@@ -35,7 +35,6 @@ struct ISvrConnection : IConnection
 {
     virtual int getId() const = 0;
     virtual int getGroupId() const = 0;
-//    virtual IConnGroup* getGroup() = 0;
 };
 
 struct IConnGroup : IObjRef
@@ -66,15 +65,12 @@ struct SvrOption
     const char *priv_key_u8;
 };
 
-typedef BOOL(*FunEnumGroup)(IConnGroup* pGroup, LPARAM ctx);
-
 struct IWsServer : IObjRef
 {
     virtual int start(uint16_t port, const char *protocolName, SvrOption option) = 0;
     virtual void broadcast(const void *text, int len, bool bBinary, int groupId = kAllGroupId) = 0;
     virtual bool wait(int timeout) = 0;
     virtual void quit() = 0;
-    virtual void enumGroup(FunEnumGroup funEnum, LPARAM ctx) = 0;
 };
 
 struct ClientOption
