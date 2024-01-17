@@ -13,7 +13,7 @@ SNSBEGIN
 
 class SvrConnection : public TObjRefImpl<ISvrConnection> {
   public:
-    SvrConnection(lws *socket, IConnGroup* pGroup, int id);
+    SvrConnection(lws *socket, ISvrListener *pSvrListener);
     ~SvrConnection();
 
     int send(const std::string &text, bool bBinary);
@@ -24,15 +24,12 @@ class SvrConnection : public TObjRefImpl<ISvrConnection> {
     int isValid() const override;
     int sendText(const char *text, int nLen = -1) override;
     int sendBinary(const void *data, int nLen) override;
-    int getGroupId() const override
-    {
-        return m_pGroup->getId();
-    }
-    int getId() const override
-    {
-        return m_id;
-    }
+    void close(const char* reason) override;
 
+    void setId(int id) override;
+    int getId() const override;
+    void setGroupId(int id) override;
+    int getGroupId() const override;
   private:
     int genMsgId()
     {
@@ -41,12 +38,11 @@ class SvrConnection : public TObjRefImpl<ISvrConnection> {
             m_msgId = 0;
         return m_msgId;
     }
-    int m_id;
+    int m_id,m_groupId;
     lws *socket;
 
     std::mutex m_mutex;
 
-    IConnGroup *m_pGroup;
     struct MsgData
     {
         std::string buf;
@@ -57,6 +53,8 @@ class SvrConnection : public TObjRefImpl<ISvrConnection> {
     std::list<MsgData> sendingBuf;
     int m_msgId;
     std::stringstream receiveStream;
+    SAutoRefPtr< ISvrListener> m_svrListener;
+
 };
 SNSEND
 #endif // WS_CONNECTION_H

@@ -2,7 +2,7 @@
 
 SNSBEGIN
 WsServer::WsServer(ISvrListener *pListener)
-    : m_pGroup(pListener)
+    : m_pSvrListener(pListener)
     , m_context(nullptr)
     , m_finished(true)
 {
@@ -84,26 +84,6 @@ void WsServer::run()
     }
 }
 
-void WsServer::broadcast(const void *text, int len, bool bBinary, int groupId)
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-    if (groupId == kAllGroupId)
-    {
-        for (const auto &it : this->m_groupMap)
-        {
-            it.second->boardcast(text, len, bBinary);
-        }
-    }
-    else
-    {
-        auto groupIt = m_groupMap.find(groupId);
-        if (groupIt != m_groupMap.end())
-        {
-            groupIt->second->boardcast(text, len, bBinary);
-        }
-    }
-}
-
 int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, size_t len)
 {
     int ret = 0;
@@ -117,42 +97,16 @@ int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userDa
         lws_hdr_copy(websocket, uriArgs, kMaxArgs, WSI_TOKEN_HTTP_URI_ARGS);
         lws_hdr_copy(websocket, uriPath, kMaxPath, WSI_TOKEN_GET_URI);
 
-        int groupId = kDefGroupId;
-        int connId = -1;
-        if (!m_pGroup->parseConnId(uriPath, uriArgs, &groupId, &connId))
-        {
+        SvrConnection *connection  = new SvrConnection(websocket, m_pSvrListener);
+        if (!m_pSvrListener->onConnected(connection, uriPath, uriArgs)) {
             lwsl_info("invalid args");
             lws_close_reason(websocket, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
+            connection->Release();
+            *(SvrConnection**)userData = nullptr;
             ret = -1;
-            break;
         }
-
-        IConnGroup *pGroup = nullptr;
-        auto it = m_groupMap.find(groupId);
-        if (it == m_groupMap.end())
-        {
-            pGroup = m_pGroup->onNewGroup(groupId,this);
-            m_groupMap.insert(std::make_pair(groupId, pGroup));
-        }
-        else
-        {
-            pGroup = it->second;
-        }
-        if (connId == -1)
-        {
-            connId = pGroup->generateConnId();
-        }
-        auto connection = new SvrConnection(websocket, pGroup, connId);
-        if (pGroup->onConnected(connection))
-        {
-            *(SvrConnection**)userData = connection;
-        }
-        else
-        {
-            // reject this conn
-            lwsl_info("connection was rejected");
-            lws_close_reason(websocket, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
-            ret = -2;
+        else {
+            *(SvrConnection**)userData = (SvrConnection*)connection;
         }
         break;
     }
@@ -162,17 +116,7 @@ int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userDa
         SvrConnection*conn = *(SvrConnection**)userData;
         if (!conn)
             break;
-        auto groupIt = m_groupMap.find(conn->getGroupId());
-        if (groupIt != m_groupMap.end())
-        {
-            IConnGroup *pGroup = groupIt->second;
-            pGroup->onDisconnect(conn);
-            if (pGroup->isEmpty())
-            {
-                m_groupMap.erase(groupIt);
-                m_pGroup->onDelGroup(pGroup);
-            }
-        }
+        m_pSvrListener->onDisconnect(conn); 
         conn->Release();
         break;
     }
@@ -180,14 +124,12 @@ int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userDa
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         SvrConnection* conn = *(SvrConnection**)userData;
-        auto it = m_groupMap.find(conn->getGroupId());
-        if (it != m_groupMap.end())
-        {
-            const std::size_t remaining = lws_remaining_packet_payload(websocket);
-            const bool isFinalFragment = lws_is_final_fragment(websocket);
-            const bool isBinary = lws_frame_is_binary(websocket);
-            conn->onRecv(std::string((const char *)data, len), !remaining && isFinalFragment, isBinary);
-        }
+        if (!conn)
+            break;
+        const std::size_t remaining = lws_remaining_packet_payload(websocket);
+        const bool isFinalFragment = lws_is_final_fragment(websocket);
+        const bool isBinary = lws_frame_is_binary(websocket);
+        conn->onRecv(std::string((const char*)data, len), !remaining && isFinalFragment, isBinary);
     }
     break;
     case LWS_CALLBACK_SERVER_WRITEABLE:

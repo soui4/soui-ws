@@ -3,7 +3,7 @@
 
 SNSBEGIN
 WsClient::WsClient(IConnListener *pGroup)
-    : m_pGroup(pGroup)
+    : m_pSvrListener(pGroup)
     , m_msgId(0)
     , m_finished(true)
     , m_connected(false)
@@ -173,9 +173,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
     {
         this->m_connected = true;
-        if (m_pGroup)
+        if (m_pSvrListener)
         {
-            m_pGroup->onConnected();
+            m_pSvrListener->onConnected();
         }
     }
     break;
@@ -187,9 +187,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
         this->m_receiveStream << std::string((const char *)data, len);
         if (!remaining && isFinalFragment)
         {
-            if (m_pGroup)
+            if (m_pSvrListener)
             {
-                m_pGroup->onDataRecv(m_receiveStream.str().c_str(), m_receiveStream.str().length(), isBinary);
+                m_pSvrListener->onDataRecv(m_receiveStream.str().c_str(), m_receiveStream.str().length(), isBinary);
             }
             m_receiveStream.str(std::string{});
         }
@@ -206,9 +206,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
             buf.resize(msgData.buf.length() + LWS_PRE);
             memcpy(buf.data() + LWS_PRE, msgData.buf.data(), msgData.buf.length());
             lws_write(m_wsi, buf.data() + LWS_PRE, msgData.buf.length(), msgData.bBinary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT);
-            if (m_pGroup)
+            if (m_pSvrListener)
             {
-                m_pGroup->onDataSent(msgData.msgId);
+                m_pSvrListener->onDataSent(msgData.msgId);
             }
             if (lws_send_pipe_choked(m_wsi))
             {
@@ -223,9 +223,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
         const char *err = (char *)data;
         this->m_finished = true;
         this->m_connected = false;
-        if (m_pGroup)
+        if (m_pSvrListener)
         {
-            m_pGroup->onConnError(err);
+            m_pSvrListener->onConnError(err);
         }
         lws_cancel_service(m_context);
     }
@@ -234,9 +234,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
     {
         this->m_finished = true;
         this->m_connected = false;
-        if (m_pGroup)
+        if (m_pSvrListener)
         {
-            m_pGroup->onDisconnect();
+            m_pSvrListener->onDisconnect();
         }
         lws_cancel_service(m_context);
     }

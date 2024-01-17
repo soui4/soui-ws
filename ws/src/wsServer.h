@@ -11,7 +11,6 @@
 #include <ws-i.h>
 #include <helper/obj-ref-impl.hpp>
 #include <string>
-#include <map>
 #include "Connection.h"
 
 SNSBEGIN
@@ -25,14 +24,13 @@ class WsServer : public TObjRefImpl<IWsServer> {
 
   public:
     int start(uint16_t port, const char *protocolName, SvrOption option) override;
-    void broadcast(const void *text, int len, bool bBinary, int groupId = kAllGroupId) override;
     bool wait(int timeoutMs) override;
     void quit() override;
   private:
     void run();
     int handler(lws *websocket, lws_callback_reasons reasons, void *id, void *data, size_t len);
 
-    ISvrListener *m_pGroup;
+    ISvrListener *m_pSvrListener;
 
     std::condition_variable m_cvQuit;
     std::mutex m_mutex;
@@ -42,7 +40,6 @@ class WsServer : public TObjRefImpl<IWsServer> {
 
     std::string m_protocolName;
     lws_context *m_context;
-    std::map<int, IConnGroup *> m_groupMap;
 
     static int cb_lws(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, std::size_t len);
 

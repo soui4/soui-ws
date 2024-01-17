@@ -4,11 +4,10 @@
 
 SNSBEGIN
 
-SvrConnection::SvrConnection(lws *socket, IConnGroup* pGroup, int id)
+SvrConnection::SvrConnection(lws *socket,ISvrListener *pSvrListener)
     : socket{ socket }
     , m_msgId(0)
-    , m_id(id)
-    , m_pGroup(pGroup)
+    , m_svrListener(pSvrListener)
 {
 }
 
@@ -51,9 +50,9 @@ void SvrConnection::sendBuf()
             // todo:close the connect
             break;
         }
-        if (m_pGroup)
+        if (m_svrListener)
         {
-            m_pGroup->onDataSent(this, msgData.msgId);
+            m_svrListener->onDataSent(this, msgData.msgId);
         }
         if (lws_send_pipe_choked(socket))
         {
@@ -68,9 +67,9 @@ void SvrConnection::onRecv(const std::string &message, bool isLastMessage, bool 
     this->receiveStream << message;
     if (isLastMessage)
     {
-        if (m_pGroup)
+        if (m_svrListener)
         {
-            m_pGroup->onDataRecv(this, message.c_str(), message.length(), bBinary);
+            m_svrListener->onDataRecv(this, message.c_str(), message.length(), bBinary);
         }
         this->receiveStream.str(std::string{});
     }
@@ -85,5 +84,25 @@ int SvrConnection::sendText(const char *text, int nLen)
 int SvrConnection::sendBinary(const void *data, int nLen)
 {
     return send(std::string((const char *)data, nLen), true);
+}
+void SvrConnection::close(const char *buf)
+{
+    lws_close_reason(socket, LWS_CLOSE_STATUS_NORMAL, (unsigned char*)buf, strlen(buf));
+}
+void SvrConnection::setId(int id)
+{
+    m_id = id;
+}
+int SvrConnection::getId() const
+{
+    return m_id;
+}
+void SvrConnection::setGroupId(int id)
+{
+    m_groupId = id;
+}
+int SvrConnection::getGroupId() const
+{
+    return m_groupId;
 }
 SNSEND

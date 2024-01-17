@@ -58,7 +58,7 @@ class WsClient : public TObjRefImpl<IWsClient> {
     void run();
     int handler(lws_callback_reasons reasons, void *user, const void *data, std::size_t len);
 
-    IConnListener *m_pGroup;
+    IConnListener *m_pSvrListener;
     std::thread m_worker;
     std::atomic_bool m_finished;
     std::atomic_bool m_connected;

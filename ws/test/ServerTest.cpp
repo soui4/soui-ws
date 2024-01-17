@@ -6,95 +6,100 @@
 
 using namespace SOUI;
 
-class ConnGroup : public TObjRefImpl<IConnGroup> {
-    int m_id;
-    std::map<int, ISvrConnection*> m_conns;
-    int m_autoId;
-    IWsServer* m_pSvr;
-  public:
-    ConnGroup(int id, IWsServer* pSvr)
-        : m_id(id)
-        , m_autoId(100000)
-        , m_pSvr(pSvr)
-    {
-    }
-
-  public:
-    virtual int getId() const
-    {
-        return m_id;
-    }
-    void onConnError(ISvrConnection *pConn, const char *errStr) override
-    {
-    }
-    bool onConnected(ISvrConnection*pConn) override
-    {
-        std::cout << "New Connection!" << std::endl;
-        if (m_conns.find(pConn->getId()) != m_conns.end())
-            return false;
-        m_conns[pConn->getId()] = pConn;
-        
-        char msg[20];
-        sprintf(msg, "group size, %d", m_conns.size());
-        boardcast(msg, -1, false);
-        return true;
-    }
-
-    void onDisconnect(ISvrConnection*pConn) override
-    {
-        std::cout << "onDisconnect!" << std::endl;
-        m_conns.erase(pConn->getId());
-
-        char msg[20];
-        sprintf(msg, "group size, %d", m_conns.size());
-        boardcast(msg, -1, false);
-    }
-    void onDataSent(ISvrConnection *pConn, int nMsgId) override
-    {
-    }
-    void onDataRecv(ISvrConnection*pConn, const void *data, int len, bool bBinary)override
-    {
-        std::cout << "Received: " << std::string((const char *)data, len).c_str() << std::endl;
-        pConn->sendText("Echo4567890123");
-    }
-
-    void boardcast(const void *data, int nLen, bool bBinary) override
-    {
-        for (auto &it : m_conns)
-        {
-            if (bBinary)
-                it.second->sendBinary(data, nLen);
-            else
-                it.second->sendText((const char *)data, nLen);
-        }
-    }
-    bool isEmpty() const override
-    {
-        return m_conns.empty();
-    }
-
-    int generateConnId() override
-    {
-        return ++m_autoId;
-    }
-};
+typedef std::map<int, IConnection*> Group;
 
 class SvrListener : public TObjRefImpl<ISvrListener> {
+    std::map<int, Group> m_conns;
   public:
-    // 通过 ISvrListener 继承
-    virtual IConnGroup *onNewGroup(int id, IWsServer* pSvr) override
+      Group* id2group(int id) {
+          auto it = m_conns.find(id);
+          if (it != m_conns.end())
+              return &it->second;
+          else
+              return nullptr;
+      }
+
+      void boardcast(Group * g, const void* buf, int len, bool bBinary) {
+          if (g) {
+              for (auto it : (*g)) {
+                  if (bBinary)
+                      it.second->sendBinary(buf, len);
+                  else
+                      it.second->sendText((const char*)buf, len);
+              }
+          }
+      }
+
+      void boardcast(int groupId, const void* buf, int len, bool bBinary) {
+          if (groupId == -1) {
+              for (auto it : m_conns) {
+                  boardcast(&it.second, buf, len, bBinary);
+              }
+          }
+          else {
+              Group* g = id2group(groupId);
+              boardcast(g, buf, len, bBinary);
+          }
+      }
+
+    virtual bool onConnected(ISvrConnection* pConn, const char* uriPath, const char* uriArgs) override
     {
-        return new ConnGroup(id, pSvr);
+        int groupId = 0, userId = 0;
+        sscanf(uriArgs, "roomid=%d&userid=%d", &groupId, &userId);
+        auto it = m_conns.find(groupId);
+        if (it == m_conns.end()) {
+            auto ret = m_conns.insert(std::make_pair(groupId, std::map<int, IConnection*>()));
+            it = ret.first;
+        }
+        if (it->second.find(userId) == it->second.end()) {
+            it->second.insert(std::make_pair(userId, pConn));
+            pConn->AddRef();
+            pConn->setId(userId);
+            pConn->setGroupId(groupId);
+
+            std::cout << "New Connection!" << std::endl;
+
+            char msg[20];
+            sprintf(msg, "group size, %d", m_conns.size());
+            boardcast(groupId,msg, -1, false);
+            return true;
+        }
+        else {
+            printf("err,groupId=%d,userId=%d\n",groupId,userId);
+            return false;
+        }
     }
-    virtual void onDelGroup(IConnGroup *pGroup) override
+    virtual void onConnError(ISvrConnection* pConn, const char* errStr) override
     {
-        pGroup->Release();
+    }
+    virtual void onDisconnect(ISvrConnection* pConn) override
+    {
+        int groupId = pConn->getGroupId();
+        int userId = pConn->getId();
+        auto it = m_conns.find(groupId);
+        if (it != m_conns.end()) {
+            auto itUser = it->second.find(userId);
+            if (itUser != it->second.end()) {
+                it->second.erase(userId);
+                pConn->Release();
+                if (it->second.empty()) {
+                    m_conns.erase(it);
+                }
+                char msg[100];
+                sprintf(msg,"conn leave,groupId=%d,userId=%d", groupId, userId);
+                boardcast(groupId, msg, -1, false);
+            }
+        }
     }
 
-    bool parseConnId(const char *uriPath, const char *uriArgs, int *groupId, int *connId) override
+    virtual void onDataSent(ISvrConnection* pConn, int nMsgId) override
     {
-        sscanf(uriArgs, "roomid=%d&userid=%d", groupId, connId);
-        return true;
+    }
+
+    virtual void onDataRecv(ISvrConnection* pConn, const void* data, int len, bool bBinary) override
+    {
+        std::cout << "Received: " << std::string((const char*)data, len).c_str() << std::endl;
+        pConn->sendText("Echo4567890123");
     }
 };
 using namespace std::chrono_literals;
