@@ -64,14 +64,15 @@ int WsServer::start(uint16_t port, const char *protocolName_, SvrOption option)
     }
 
     contextCreationInfo.user = this;
+    m_finished = false;
     this->m_context = lws_create_context(&contextCreationInfo);
 
     if (!this->m_context)
     {
+        m_finished = true;
         lwsl_err("%s: Could not initialize websocket\n", __func__);
         return -1;
     }
-    m_finished = false;
     this->m_worker = std::thread{ &WsServer::run, this };
     return 0;
 }
@@ -87,6 +88,8 @@ void WsServer::run()
 int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, size_t len)
 {
     int ret = 0;
+    if (m_finished)
+        return -1;
     switch (reasons)
     {
     case LWS_CALLBACK_ESTABLISHED:
