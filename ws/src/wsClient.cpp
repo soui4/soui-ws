@@ -71,11 +71,13 @@ int WsClient::connectTo(const char *server_, const char *path_, uint16_t port_, 
     {
         contextCreationInfo.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     }
+    m_finished = false;
     this->m_context = lws_create_context(&contextCreationInfo);
 
     if (!this->m_context)
     {
         lwsl_err("%s: create lws context failed!\n", __func__);
+        m_finished = true;
         return -1;
     }
 
@@ -103,9 +105,9 @@ int WsClient::connectTo(const char *server_, const char *path_, uint16_t port_, 
     if (!lws_client_connect_via_info(&clientConnectInfo))
     {
         lwsl_err("%s: Could not connect!\n", __func__);
+        m_finished = true;
         return -1;
     }
-    m_finished = false;
     this->m_worker = std::thread{ &WsClient::run, this };
     return 0;
 }
@@ -159,7 +161,7 @@ void WsClient::run()
 {
     while (!m_finished)
     {
-        lws_service(this->m_context, 50);
+        lws_service(this->m_context, 100);
     }
     lws_context_destroy(m_context);
     m_context = nullptr;
