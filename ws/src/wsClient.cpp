@@ -3,7 +3,7 @@
 
 SNSBEGIN
 WsClient::WsClient(IConnListener *pGroup)
-    : m_pSvrListener(pGroup)
+    : m_pListener(pGroup)
     , m_msgId(0)
     , m_finished(true)
     , m_connected(false)
@@ -112,18 +112,19 @@ int WsClient::connectTo(const char *server_, const char *path_, uint16_t port_, 
 
 void WsClient::quit()
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-    if (!m_finished)
     {
-        this->m_finished = true;
-        lws_cancel_service(m_context);
-        this->m_worker.join();
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        if (m_finished) {
+            if (this->m_worker.joinable())
+                this->m_worker.detach();
+            return;
+        }
+        else {
+            this->m_finished = true;
+            lws_cancel_service(m_context);
+        }
     }
-    else
-    {
-        if (this->m_worker.joinable())
-            this->m_worker.detach();
-    }
+    this->m_worker.join();
 }
 
 bool WsClient::wait(int timeout)
@@ -167,15 +168,20 @@ void WsClient::run()
 
 int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data, std::size_t len)
 {
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+    if (this->m_finished)
+    {
+        return -1;
+    }
     lwsl_info("%s,reaon=%d\n", __func__, reasons);
     switch (reasons)
     {
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
     {
         this->m_connected = true;
-        if (m_pSvrListener)
+        if (m_pListener)
         {
-            m_pSvrListener->onConnected();
+            m_pListener->onConnected();
         }
     }
     break;
@@ -187,9 +193,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
         this->m_receiveStream << std::string((const char *)data, len);
         if (!remaining && isFinalFragment)
         {
-            if (m_pSvrListener)
+            if (m_pListener)
             {
-                m_pSvrListener->onDataRecv(m_receiveStream.str().c_str(), m_receiveStream.str().length(), isBinary);
+                m_pListener->onDataRecv(m_receiveStream.str().c_str(), m_receiveStream.str().length(), isBinary);
             }
             m_receiveStream.str(std::string{});
         }
@@ -197,7 +203,6 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
     break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
     {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
         while (!m_sendingBuf.empty())
         {
             MsgData msgData = m_sendingBuf.front();
@@ -206,9 +211,9 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
             buf.resize(msgData.buf.length() + LWS_PRE);
             memcpy(buf.data() + LWS_PRE, msgData.buf.data(), msgData.buf.length());
             lws_write(m_wsi, buf.data() + LWS_PRE, msgData.buf.length(), msgData.bBinary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT);
-            if (m_pSvrListener)
+            if (m_pListener)
             {
-                m_pSvrListener->onDataSent(msgData.msgId);
+                m_pListener->onDataSent(msgData.msgId);
             }
             if (lws_send_pipe_choked(m_wsi))
             {
@@ -221,24 +226,24 @@ int WsClient::handler(lws_callback_reasons reasons, void *user, const void *data
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
     {
         const char *err = (char *)data;
-        this->m_finished = true;
         this->m_connected = false;
-        if (m_pSvrListener)
+        if (m_pListener)
         {
-            m_pSvrListener->onConnError(err);
+            m_pListener->onConnError(err);
         }
         lws_cancel_service(m_context);
+        this->m_finished = true;
     }
     break;
     case LWS_CALLBACK_CLIENT_CLOSED:
     {
-        this->m_finished = true;
         this->m_connected = false;
-        if (m_pSvrListener)
+        if (m_pListener)
         {
-            m_pSvrListener->onDisconnect();
+            m_pListener->onDisconnect();
         }
         lws_cancel_service(m_context);
+        this->m_finished = true;
     }
     break;
     default:

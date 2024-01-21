@@ -58,9 +58,8 @@ class WsClient : public TObjRefImpl<IWsClient> {
     void run();
     int handler(lws_callback_reasons reasons, void *user, const void *data, std::size_t len);
 
-    IConnListener *m_pSvrListener;
+    IConnListener *m_pListener;
     std::thread m_worker;
-    std::atomic_bool m_finished;
     std::atomic_bool m_connected;
 
     std::string m_server, m_path;
@@ -72,6 +71,7 @@ class WsClient : public TObjRefImpl<IWsClient> {
 
     std::mutex m_mutex;
     std::condition_variable m_cvQuit;
+    std::atomic_bool m_finished;
 
     std::stringstream m_receiveStream;
 

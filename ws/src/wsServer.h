@@ -30,7 +30,7 @@ class WsServer : public TObjRefImpl<IWsServer> {
     void run();
     int handler(lws *websocket, lws_callback_reasons reasons, void *id, void *data, size_t len);
 
-    ISvrListener *m_pSvrListener;
+    ISvrListener *m_pListener;
 
     std::condition_variable m_cvQuit;
     std::mutex m_mutex;

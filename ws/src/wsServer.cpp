@@ -2,7 +2,7 @@
 
 SNSBEGIN
 WsServer::WsServer(ISvrListener *pListener)
-    : m_pSvrListener(pListener)
+    : m_pListener(pListener)
     , m_context(nullptr)
     , m_finished(true)
 {
@@ -87,21 +87,21 @@ void WsServer::run()
 
 int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userData, void *data, size_t len)
 {
-    int ret = 0;
+    std::unique_lock<std::mutex> lock(m_mutex);
     if (m_finished)
         return -1;
+    int ret = 0;
     switch (reasons)
     {
     case LWS_CALLBACK_ESTABLISHED:
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
         static const int kMaxArgs = 1024, kMaxPath = 100;
         char uriArgs[kMaxArgs] = { 0 }, uriPath[kMaxPath] = { 0 };
         lws_hdr_copy(websocket, uriArgs, kMaxArgs, WSI_TOKEN_HTTP_URI_ARGS);
         lws_hdr_copy(websocket, uriPath, kMaxPath, WSI_TOKEN_GET_URI);
 
-        SvrConnection *connection  = new SvrConnection(websocket, m_pSvrListener);
-        if (!m_pSvrListener->onConnected(connection, uriPath, uriArgs)) {
+        SvrConnection *connection  = new SvrConnection(websocket, m_pListener);
+        if (!m_pListener->onConnected(connection, uriPath, uriArgs)) {
             lwsl_info("invalid args");
             lws_close_reason(websocket, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
             connection->Release();
@@ -115,17 +115,15 @@ int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userDa
     }
     case LWS_CALLBACK_CLOSED:
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
         SvrConnection*conn = *(SvrConnection**)userData;
         if (!conn)
             break;
-        m_pSvrListener->onDisconnect(conn); 
+        m_pListener->onDisconnect(conn); 
         conn->Release();
         break;
     }
     case LWS_CALLBACK_RECEIVE:
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
         SvrConnection* conn = *(SvrConnection**)userData;
         if (!conn)
             break;
@@ -137,7 +135,6 @@ int WsServer::handler(lws *websocket, lws_callback_reasons reasons, void *userDa
     break;
     case LWS_CALLBACK_SERVER_WRITEABLE:
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
         SvrConnection* conn = *(SvrConnection**)userData;
         if (conn)
         {
@@ -172,10 +169,12 @@ bool WsServer::wait(int timeout)
 
 void WsServer::quit()
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    if (this->m_finished)
-        return;
-    this->m_finished = true;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (this->m_finished)
+            return;
+        this->m_finished = true;
+    }
     lws_cancel_service(m_context);
     this->m_worker.join();
     lws_context_destroy(m_context);
